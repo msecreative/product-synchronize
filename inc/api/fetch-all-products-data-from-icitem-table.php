@@ -5,7 +5,7 @@
  */
 function fetch_all_products_data_from_icitem_table($page) {
 
-    $url = 'https://modern.cansoft.com/tables/ICITEM.php';
+    $url = 'https://modern.cansoft.com/db-clone/api/icitem';
 
     $params = array(
         'page' => $page

@@ -51,6 +51,6 @@
          curl_close($ch);
             
         if( count( $all_quantity_locations )){
-            mb_sync_iciloc_product($page+1);
+            mb_sync_iciloc_product($page);
         }
     }

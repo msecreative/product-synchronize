@@ -146,6 +146,7 @@ function mb_products_sync(){
 
                 <form method="POST">
                     <?php 
+                        submit_button( 'Start ICILOC Menual', 'primary', 'mb-iciloc-product-sync-menual' );
                         submit_button( 'Start ICILOC Cron Now', 'primary', 'mb-iciloc-product-submit-start-cron' );
                     ?>
                 </form>
@@ -154,6 +155,12 @@ function mb_products_sync(){
             <?php 
 
             if (isset($_POST["mb-icitem-product-submit-menual"])) {
+                mb_icitem_sync_product(1);
+                wp_redirect( admin_url( "/edit.php?post_type=product&page=product-sync" ) );
+                exit();
+            }
+
+            if (isset($_POST["mb-iciloc-product-sync-menual"])) {
                 mb_icitem_sync_product(0);
                 wp_redirect( admin_url( "/edit.php?post_type=product&page=product-sync" ) );
                 exit();
@@ -166,16 +173,19 @@ function mb_products_sync(){
                  */
                 if(isset($_GET['pageno'])){
 
-                    $i = $_GET['pageno'] ?? 0;
+                    $i = $_GET['pageno'] ?? 1;
 
                     $all_products = fetch_all_products_data_from_icitem_table($i);
-
+                    $start = microtime(true);
+                    $api_ids = [];
                     foreach($all_products as $product){
                         /**
                          * Check Product not exit 
                          * 
                          * if product already exit than it will be not created as a product
                          */
+                        $api_ids[] = $product['id'];
+
                         if( ! mb_product_exit($product['ITEMNO'] )){
                             //create product
                             $post_id = wp_insert_post( array(
@@ -183,18 +193,59 @@ function mb_products_sync(){
                                 'post_status' => 'publish',
                                 'post_type' => "product",
                             ) );
-
-                            //get category
                             $category = get_cat_by_meta_value_and_key($product['CATEGORY']);
-
                             //set category
                             wp_set_object_terms( $post_id, $category, 'product_cat');
                             //set all meta value
                             update_post_meta( $post_id, '_sku', $product['FMTITEMNO'] );
-                            update_post_meta( $post_id, 'itemno', $product['ITEMNO'] );
                             update_post_meta( $post_id, 'inactive', $product['INACTIVE']);
+                            update_post_meta( $post_id, 'itemno', $product['ITEMNO'] );
+                        }else{
+                            $post_id = get_product_id_by_itemno_meta_value($product["ITEMNO"]);
+
+                            wp_update_post($post_id, 'post_title', $product['DESC']);
+                            update_post_meta( $post_id, 'inactive', $product['INACTIVE']);
+                            $category = get_cat_by_meta_value_and_key($product['CATEGORY']);
+                            //set category
+                            wp_set_object_terms( $post_id, $category, 'product_cat');
+                            //set all meta value
+                            update_post_meta( $post_id, '_sku', $product['FMTITEMNO'] );
                         }
                     }
+
+                    // Send an update request to another API
+                    $api_url = 'https://modern.cansoft.com/db-clone/api/icitem/update'; // Replace with your API endpoint
+                    
+                    $api_data = [
+                        'id' => implode(',', $api_ids),
+                        'status' => "Synced",
+                    ];
+
+                    echo "<pre>";
+					print_r($api_data);
+					echo "</pre>";
+
+                    // Use cURL to make the API request
+                    $ch = curl_init($api_url);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($api_data));
+                    $response = curl_exec($ch);
+
+                    // Check for errors or process the response as needed
+                    if ($response === false) {
+                        // Handle cURL error
+                        echo 'cURL Error: ' . curl_error($ch);
+                    } else {
+                        // Process the API response
+                        // $response contains the API response data
+                        echo 'API Response: ' . $response;
+                    }
+
+                    // Close the cURL session
+                    curl_close($ch);
+
+                    $total = microtime(true) - $start;
+                    echo "Total Execution time: " . $total;
 
                     if(! count($all_products)){
 
@@ -236,8 +287,8 @@ function mb_products_sync(){
                     echo "<span style'color:red;font-weight:bold'>Total Execution Time: </span>" . $total;
 
                     // API endpoint
-					$apiUrl = 'https://modern.cansoft.com/db-clone/api/iciloc/update';
-
+					$apiUrl = 'modern.cansoft.com/db-clone/api/icitem/update';
+                    
 					// List of update IDs
 					$updateIds = implode(",", $api_ids);
 					echo "<pre>";

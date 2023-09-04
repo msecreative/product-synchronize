@@ -1,8 +1,8 @@
 <?php 
-    function mb_icitem_sync_product($page = 0){
+    function mb_icitem_sync_product($page = 1){
 
         $all_products = fetch_all_products_data_from_icitem_table($page);
-
+        
         foreach($all_products as $product){
             if( ! mb_product_exit($product['ITEMNO'] )){
                 //create product
@@ -11,7 +11,7 @@
                     'post_status' => 'publish',
                     'post_type' => "product",
                 ) );
-
+               
                 //get category
                 $category = get_cat_by_meta_value_and_key($product['CATEGORY']);
 
@@ -24,10 +24,19 @@
                 update_post_meta( $post_id, 'inactive', $product['INACTIVE']);
             }
         }
-        
+
+       
         if (count($all_products)) {
 
-            mb_icitem_sync_product($page+1);
+            mb_icitem_sync_product($page);
 
         }
+        $total = microtime(true) - $start;
+        echo "Total Execution time: " . $total;
+
+        if (!count($all_products)) {
+           wp_redirect( admin_url( "/edit.php?post_type=product&page=product-sync?msg=success" ) );
+            exit();
+        }
+
     }
